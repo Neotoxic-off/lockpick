@@ -1,14 +1,12 @@
 mod arguments;
-mod aes_candidate;
-mod aes_dumpster;
-mod output;
+mod aes;
 
 use clap::Parser;
 use log::{error, info};
 use std::io::Result as IoResult;
 use std::path::PathBuf;
 
-use aes_dumpster::AesDumpster;
+use aes::Aes;
 use arguments::Args;
 
 fn load_file(path: &PathBuf) -> IoResult<Vec<u8>> {
@@ -50,8 +48,8 @@ fn main() -> IoResult<()> {
         }
     };
 
-    let dumpster: AesDumpster = AesDumpster::new(buffer, args.entropy);
-    dumpster.scan();
+    let aes: Aes = Aes::new(buffer, args.entropy);
+    aes.scan();
 
     Ok(())
 }

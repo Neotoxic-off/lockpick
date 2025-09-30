@@ -1,9 +1,7 @@
 use log::{info, debug};
 use std::collections::HashSet;
 
-use crate::aes_candidate::{AesKeyCandidate, KeyType};
-
-pub struct AesDumpster {
+pub struct Aes {
     buffer: Vec<u8>,
     min_entropy: f64,
     known_false_positives: Vec<Vec<u8>>,
@@ -11,13 +9,33 @@ pub struct AesDumpster {
 pub struct ScanRule<'a> {
     key_type: KeyType,
     alignment: usize,
-    pattern_fn: Box<dyn Fn(&AesDumpster, usize, &[u8]) -> bool + 'a>,
+    pattern_fn: Box<dyn Fn(&Aes, usize, &[u8]) -> bool + 'a>,
 }
 
-impl AesDumpster {
+#[derive(Debug, Clone, PartialEq)]
+pub enum KeyType {
+    Type1,
+    Type2,
+    Type3,
+    Type4,
+}
+
+impl std::fmt::Display for KeyType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            KeyType::Type1 => write!(f, "Type1"),
+            KeyType::Type2 => write!(f, "Type2"),
+            KeyType::Type3 => write!(f, "Type3"),
+            KeyType::Type4 => write!(f, "Type4"),
+        }
+    }
+}
+
+
+impl Aes {
     pub fn new(buffer: Vec<u8>, min_entropy: f64) -> Self {
         let known_false_positives: Vec<Vec<u8>> = Self::initialize_false_positives();
-        info!("Initialized AESDumpster with {} bytes buffer", buffer.len());
+        info!("Initialized Aes with {} bytes buffer", buffer.len());
         debug!("Minimum entropy: {}", min_entropy);
         debug!("Known false positives: {}", known_false_positives.len());
 
@@ -58,7 +76,7 @@ impl AesDumpster {
         self.known_false_positives.iter().any(|fp| fp == key)
     }
 
-    pub fn scan(&self) -> Vec<AesKeyCandidate> {
+    pub fn scan(&self) -> () {
         let rules: Vec<ScanRule> = vec![
             ScanRule {
                 key_type: KeyType::Type1,
@@ -85,8 +103,6 @@ impl AesDumpster {
             }
         ];
 
-        let mut candidates: Vec<AesKeyCandidate> = Vec::new();
-
         for i in 0..self.buffer.len().saturating_sub(32) {
             let key_bytes = &self.buffer[i..i + 32];
 
@@ -109,22 +125,8 @@ impl AesDumpster {
                     .collect::<String>();
 
                 info!("[{:?}](0x{:08X})|{:.2}|: {}", rule.key_type, i, entropy, hex_string);
-
-                candidates.push(AesKeyCandidate {
-                    offset: i,
-                    key: key_bytes.to_vec(),
-                    key_type: rule.key_type.clone(),
-                    entropy,
-                    hex_string,
-                });
             }
         }
-
-        candidates.sort_by(|a, b| b.entropy.partial_cmp(&a.entropy).unwrap());
-        candidates.dedup_by(|a, b| a.key == b.key);
-
-        info!("Scan complete: {} unique candidates", candidates.len());
-        candidates
     }
 
     fn has_ue_signature(&self, offset: usize) -> bool {
